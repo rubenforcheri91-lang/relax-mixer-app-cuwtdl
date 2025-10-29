@@ -1,8 +1,8 @@
 
 {
   "expo": {
-    "name": "Natively",
-    "slug": "natively",
+    "name": "Relaxation Mixer",
+    "slug": "relaxation-mixer",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/final_quest_240x240.png",
@@ -11,7 +11,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.natively.app",
+      "bundleIdentifier": "com.natively.relaxationmixer",
       "infoPlist": {
         "UIBackgroundModes": [
           "audio"
@@ -21,9 +21,14 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/final_quest_240x240.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#4A90E2"
       },
-      "package": "com.natively.app"
+      "package": "com.natively.relaxationmixer",
+      "versionCode": 1,
+      "permissions": [
+        "FOREGROUND_SERVICE",
+        "WAKE_LOCK"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -35,14 +40,25 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#4A90E2",
           "image": "./assets/images/final_quest_240x240.png",
           "imageWidth": 200
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id-here"
+      }
     }
   }
 }
