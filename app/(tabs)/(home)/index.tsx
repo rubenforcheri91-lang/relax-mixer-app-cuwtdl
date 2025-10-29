@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
@@ -14,7 +14,29 @@ export default function HomeScreen() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [volumes, setVolumes] = useState<{ [key: string]: number }>({});
   const [currentLoopIndices, setCurrentLoopIndices] = useState<{ [key: string]: number }>({});
-  const [players, setPlayers] = useState<{ [key: string]: any }>({});
+
+  // Create audio players at the top level using hooks
+  const player1 = useAudioPlayer(RELAXATION_SOUNDS[0]?.urls[currentLoopIndices[RELAXATION_SOUNDS[0]?.id] || 0] || '', { updateInterval: 100 });
+  const player2 = useAudioPlayer(RELAXATION_SOUNDS[1]?.urls[currentLoopIndices[RELAXATION_SOUNDS[1]?.id] || 0] || '', { updateInterval: 100 });
+  const player3 = useAudioPlayer(RELAXATION_SOUNDS[2]?.urls[currentLoopIndices[RELAXATION_SOUNDS[2]?.id] || 0] || '', { updateInterval: 100 });
+  const player4 = useAudioPlayer(RELAXATION_SOUNDS[3]?.urls[currentLoopIndices[RELAXATION_SOUNDS[3]?.id] || 0] || '', { updateInterval: 100 });
+  const player5 = useAudioPlayer(RELAXATION_SOUNDS[4]?.urls[currentLoopIndices[RELAXATION_SOUNDS[4]?.id] || 0] || '', { updateInterval: 100 });
+  const player6 = useAudioPlayer(RELAXATION_SOUNDS[5]?.urls[currentLoopIndices[RELAXATION_SOUNDS[5]?.id] || 0] || '', { updateInterval: 100 });
+  const player7 = useAudioPlayer(RELAXATION_SOUNDS[6]?.urls[currentLoopIndices[RELAXATION_SOUNDS[6]?.id] || 0] || '', { updateInterval: 100 });
+
+  // Map players to sound IDs
+  const players = useMemo(() => {
+    const playerMap: { [key: string]: any } = {};
+    const playerList = [player1, player2, player3, player4, player5, player6, player7];
+    
+    RELAXATION_SOUNDS.forEach((sound, index) => {
+      if (playerList[index]) {
+        playerMap[sound.id] = playerList[index];
+      }
+    });
+    
+    return playerMap;
+  }, [player1, player2, player3, player4, player5, player6, player7]);
 
   // Initialize volumes and loop indices
   useEffect(() => {
@@ -48,28 +70,14 @@ export default function HomeScreen() {
     configureAudio();
   }, []);
 
-  // Create audio players dynamically
+  // Set loop property for all players
   useEffect(() => {
-    if (Object.keys(currentLoopIndices).length === 0) return;
-
-    const newPlayers: { [key: string]: any } = {};
-    
-    RELAXATION_SOUNDS.forEach((sound) => {
-      const loopIndex = currentLoopIndices[sound.id] || 0;
-      const url = sound.urls[loopIndex];
-      
-      // Create player using the hook
-      const player = useAudioPlayer(url, { updateInterval: 100 });
-      player.loop = true;
-      player.volume = volumes[sound.id] || 0.5;
-      
-      newPlayers[sound.id] = player;
+    Object.values(players).forEach((player) => {
+      if (player) {
+        player.loop = true;
+      }
     });
-    
-    setPlayers(newPlayers);
-    
-    console.log('Audio players created');
-  }, [currentLoopIndices]);
+  }, [players]);
 
   // Update volumes when changed
   useEffect(() => {
@@ -95,22 +103,25 @@ export default function HomeScreen() {
     const currentIndex = currentLoopIndices[soundId] || 0;
     const nextIndex = (currentIndex + 1) % sound.urls.length;
     
+    const wasPlaying = isPlaying;
+    
+    // Pause the specific player before changing loop
+    if (players[soundId]) {
+      players[soundId].pause();
+    }
+    
     setCurrentLoopIndices((prev) => ({
       ...prev,
       [soundId]: nextIndex,
     }));
 
-    // If currently playing, restart with new loop
-    if (isPlaying && players[soundId]) {
-      const player = players[soundId];
-      player.pause();
-      
-      // Small delay to allow player to update
+    // Resume playing after a short delay if it was playing
+    if (wasPlaying) {
       setTimeout(() => {
         if (players[soundId]) {
           players[soundId].play();
         }
-      }, 100);
+      }, 200);
     }
 
     console.log(`Changed loop for ${soundId} to index ${nextIndex}`);
