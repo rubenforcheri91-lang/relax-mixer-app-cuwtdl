@@ -2,47 +2,84 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Platform } from 'react-native';
 import { Stack } from 'expo-router';
-import { useAudioPlayer } from 'expo-audio';
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { IconSymbol } from '@/components/IconSymbol';
 import SoundChannel from '@/components/SoundChannel';
-import { colors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/styles/commonStyles';
 import { RELAXATION_SOUNDS } from '@/types/sounds';
+import * as Haptics from 'expo-haptics';
 
 export default function HomeScreen() {
+  const colors = useThemeColors();
   const [isPlaying, setIsPlaying] = useState(false);
-  const [volumes, setVolumes] = useState<{ [key: string]: number }>({
-    rain: 0.5,
-    ocean: 0.5,
-    fire: 0.5,
-    wind: 0.5,
-    waterfall: 0.5,
-  });
+  const [volumes, setVolumes] = useState<{ [key: string]: number }>({});
+  const [currentLoopIndices, setCurrentLoopIndices] = useState<{ [key: string]: number }>({});
+  const [players, setPlayers] = useState<{ [key: string]: any }>({});
 
-  // Create audio players for each sound
-  const players = {
-    rain: useAudioPlayer(RELAXATION_SOUNDS[0].url, { updateInterval: 100 }),
-    ocean: useAudioPlayer(RELAXATION_SOUNDS[1].url, { updateInterval: 100 }),
-    fire: useAudioPlayer(RELAXATION_SOUNDS[2].url, { updateInterval: 100 }),
-    wind: useAudioPlayer(RELAXATION_SOUNDS[3].url, { updateInterval: 100 }),
-    waterfall: useAudioPlayer(RELAXATION_SOUNDS[4].url, { updateInterval: 100 }),
-  };
-
-  // Set initial volumes and loop
+  // Initialize volumes and loop indices
   useEffect(() => {
-    Object.keys(players).forEach((key) => {
-      const player = players[key as keyof typeof players];
-      player.loop = true;
-      player.volume = volumes[key];
+    const initialVolumes: { [key: string]: number } = {};
+    const initialLoopIndices: { [key: string]: number } = {};
+    
+    RELAXATION_SOUNDS.forEach((sound) => {
+      initialVolumes[sound.id] = 0.5;
+      initialLoopIndices[sound.id] = 0;
     });
+    
+    setVolumes(initialVolumes);
+    setCurrentLoopIndices(initialLoopIndices);
   }, []);
+
+  // Configure audio mode for background playback
+  useEffect(() => {
+    const configureAudio = async () => {
+      try {
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          shouldPlayInBackground: true,
+          staysActiveInBackground: true,
+        });
+        console.log('Audio mode configured for background playback');
+      } catch (error) {
+        console.error('Error configuring audio mode:', error);
+      }
+    };
+    
+    configureAudio();
+  }, []);
+
+  // Create audio players dynamically
+  useEffect(() => {
+    if (Object.keys(currentLoopIndices).length === 0) return;
+
+    const newPlayers: { [key: string]: any } = {};
+    
+    RELAXATION_SOUNDS.forEach((sound) => {
+      const loopIndex = currentLoopIndices[sound.id] || 0;
+      const url = sound.urls[loopIndex];
+      
+      // Create player using the hook
+      const player = useAudioPlayer(url, { updateInterval: 100 });
+      player.loop = true;
+      player.volume = volumes[sound.id] || 0.5;
+      
+      newPlayers[sound.id] = player;
+    });
+    
+    setPlayers(newPlayers);
+    
+    console.log('Audio players created');
+  }, [currentLoopIndices]);
 
   // Update volumes when changed
   useEffect(() => {
     Object.keys(players).forEach((key) => {
-      const player = players[key as keyof typeof players];
-      player.volume = volumes[key];
+      const player = players[key];
+      if (player) {
+        player.volume = volumes[key] || 0;
+      }
     });
-  }, [volumes]);
+  }, [volumes, players]);
 
   const handleVolumeChange = (soundId: string, volume: number) => {
     setVolumes((prev) => ({
@@ -51,29 +88,74 @@ export default function HomeScreen() {
     }));
   };
 
+  const handleLoopChange = (soundId: string) => {
+    const sound = RELAXATION_SOUNDS.find(s => s.id === soundId);
+    if (!sound) return;
+
+    const currentIndex = currentLoopIndices[soundId] || 0;
+    const nextIndex = (currentIndex + 1) % sound.urls.length;
+    
+    setCurrentLoopIndices((prev) => ({
+      ...prev,
+      [soundId]: nextIndex,
+    }));
+
+    // If currently playing, restart with new loop
+    if (isPlaying && players[soundId]) {
+      const player = players[soundId];
+      player.pause();
+      
+      // Small delay to allow player to update
+      setTimeout(() => {
+        if (players[soundId]) {
+          players[soundId].play();
+        }
+      }, 100);
+    }
+
+    console.log(`Changed loop for ${soundId} to index ${nextIndex}`);
+  };
+
   const togglePlayPause = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+
     if (isPlaying) {
       // Pause all players
       Object.values(players).forEach((player) => {
-        player.pause();
+        if (player) {
+          player.pause();
+        }
       });
       setIsPlaying(false);
+      console.log('Paused all sounds');
     } else {
       // Play all players
       Object.values(players).forEach((player) => {
-        player.play();
+        if (player) {
+          player.play();
+        }
       });
       setIsPlaying(true);
+      console.log('Playing all sounds');
     }
   };
 
   const resetAllVolumes = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
     const resetVolumes: { [key: string]: number } = {};
     Object.keys(volumes).forEach((key) => {
       resetVolumes[key] = 0.5;
     });
     setVolumes(resetVolumes);
+    console.log('Reset all volumes to 50%');
   };
+
+  const styles = createStyles(colors);
 
   return (
     <>
@@ -107,9 +189,12 @@ export default function HomeScreen() {
                 key={sound.id}
                 name={sound.name}
                 icon={sound.icon}
-                volume={volumes[sound.id]}
+                volume={volumes[sound.id] || 0.5}
                 onVolumeChange={(volume) => handleVolumeChange(sound.id, volume)}
                 color={sound.color}
+                currentLoopIndex={currentLoopIndices[sound.id] || 0}
+                totalLoops={sound.urls.length}
+                onLoopChange={() => handleLoopChange(sound.id)}
               />
             ))}
           </View>
@@ -137,10 +222,17 @@ export default function HomeScreen() {
 
           <View style={styles.infoCard}>
             <IconSymbol name="info.circle.fill" size={24} color={colors.primary} />
-            <Text style={styles.infoText}>
-              Combina i suoni per creare la tua esperienza di rilassamento personalizzata.
-              Ogni canale può essere regolato indipendentemente.
-            </Text>
+            <View style={styles.infoTextContainer}>
+              <Text style={styles.infoText}>
+                Combina i suoni per creare la tua esperienza di rilassamento personalizzata.
+              </Text>
+              <Text style={styles.infoText}>
+                • Tocca le icone per cambiare i loop dei suoni
+              </Text>
+              <Text style={styles.infoText}>
+                • L&apos;audio continua in background e con schermo bloccato
+              </Text>
+            </View>
           </View>
         </ScrollView>
       </View>
@@ -148,7 +240,7 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -230,10 +322,13 @@ const styles = StyleSheet.create({
     gap: 12,
     alignItems: 'flex-start',
   },
-  infoText: {
+  infoTextContainer: {
     flex: 1,
+  },
+  infoText: {
     fontSize: 14,
     color: colors.text,
     lineHeight: 20,
+    marginBottom: 4,
   },
 });

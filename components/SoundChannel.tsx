@@ -1,8 +1,9 @@
 
 import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform, TouchableOpacity } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { colors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/styles/commonStyles';
+import * as Haptics from 'expo-haptics';
 
 interface SoundChannelProps {
   name: string;
@@ -10,21 +11,62 @@ interface SoundChannelProps {
   volume: number;
   onVolumeChange: (volume: number) => void;
   color: string;
+  currentLoopIndex: number;
+  totalLoops: number;
+  onLoopChange: () => void;
 }
 
-export default function SoundChannel({ name, icon, volume, onVolumeChange, color }: SoundChannelProps) {
+export default function SoundChannel({ 
+  name, 
+  icon, 
+  volume, 
+  onVolumeChange, 
+  color,
+  currentLoopIndex,
+  totalLoops,
+  onLoopChange,
+}: SoundChannelProps) {
+  const colors = useThemeColors();
+
+  const handleLoopChange = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    onLoopChange();
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.card }]}>
       <View style={styles.header}>
-        <View style={[styles.iconContainer, { backgroundColor: color }]}>
+        <TouchableOpacity 
+          style={[styles.iconContainer, { backgroundColor: color }]}
+          onPress={handleLoopChange}
+          activeOpacity={0.7}
+        >
           <Text style={styles.icon}>{icon}</Text>
+          {totalLoops > 1 && (
+            <View style={styles.loopBadge}>
+              <Text style={styles.loopBadgeText}>
+                {currentLoopIndex + 1}/{totalLoops}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <View style={styles.nameContainer}>
+          <Text style={[styles.name, { color: colors.text }]}>{name}</Text>
+          {totalLoops > 1 && (
+            <Text style={[styles.loopHint, { color: colors.textSecondary }]}>
+              Tocca l&apos;icona per cambiare loop
+            </Text>
+          )}
         </View>
-        <Text style={styles.name}>{name}</Text>
       </View>
       
       <View style={styles.faderContainer}>
         <View style={styles.volumeIndicator}>
-          <Text style={styles.volumeText}>{Math.round(volume * 100)}%</Text>
+          <Text style={[styles.volumeText, { color: color }]}>
+            {Math.round(volume * 100)}%
+          </Text>
         </View>
         
         <View style={styles.sliderWrapper}>
@@ -41,11 +83,11 @@ export default function SoundChannel({ name, icon, volume, onVolumeChange, color
           />
           
           <View style={styles.scaleMarkers}>
-            <View style={styles.marker} />
-            <View style={styles.marker} />
-            <View style={styles.marker} />
-            <View style={styles.marker} />
-            <View style={styles.marker} />
+            <View style={[styles.marker, { backgroundColor: colors.accent }]} />
+            <View style={[styles.marker, { backgroundColor: colors.accent }]} />
+            <View style={[styles.marker, { backgroundColor: colors.accent }]} />
+            <View style={[styles.marker, { backgroundColor: colors.accent }]} />
+            <View style={[styles.marker, { backgroundColor: colors.accent }]} />
           </View>
         </View>
       </View>
@@ -55,7 +97,6 @@ export default function SoundChannel({ name, icon, volume, onVolumeChange, color
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -68,21 +109,44 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    position: 'relative',
   },
   icon: {
-    fontSize: 24,
+    fontSize: 28,
+  },
+  loopBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 32,
+    alignItems: 'center',
+  },
+  loopBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  nameContainer: {
+    flex: 1,
   },
   name: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
-    flex: 1,
+  },
+  loopHint: {
+    fontSize: 11,
+    marginTop: 2,
+    fontStyle: 'italic',
   },
   faderContainer: {
     flexDirection: 'row',
@@ -96,7 +160,6 @@ const styles = StyleSheet.create({
   volumeText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.primary,
   },
   sliderWrapper: {
     flex: 1,
@@ -121,7 +184,6 @@ const styles = StyleSheet.create({
   marker: {
     width: 2,
     height: 12,
-    backgroundColor: colors.accent,
     opacity: 0.3,
   },
 });
